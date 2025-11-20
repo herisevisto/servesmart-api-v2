@@ -447,7 +447,7 @@ export const finalizeMatch = async (req, res) => {
         const eventsToArchive = statEntries.map(entry => {
             const teamData = teamMap[entry.team];
 
-            if(!resolvedTeamId){
+            if (!teamData) { 
                 console.warn(`⚠️ Warning: No team_id found for team "${entry.team}" in match ${match_no}`);
             }
             return{
