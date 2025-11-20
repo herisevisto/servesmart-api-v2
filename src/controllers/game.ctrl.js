@@ -436,7 +436,7 @@ export const finalizeMatch = async (req, res) => {
         // COPY TO EVENT INFO
         const uniqueTeamNames = [...new Set(statEntries.map(e => e.team))];
         const teamDocs = await Team.find({ name: { $in: uniqueTeamNames } });
-        const teamIdMap = {};
+        const teamMap = {}
         teamDocs.forEach(t => {
             teamMap[t.name] = { 
                 id: t.team_id, 
