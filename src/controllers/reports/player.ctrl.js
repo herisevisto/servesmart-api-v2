@@ -82,7 +82,7 @@ export const computeEfficiencies = (report) => {
     (reception.total_attempts || 0) +
     (block.total_attempts || 0);
 
-  const overallEff = calcEff(pointsScored - errors, totalAttempts);
+  const overallEff = calcEff((pointsScored - errors), totalAttempts);
 
   return {
     ...base,
@@ -193,7 +193,7 @@ export const updatePlayerReportsFromEvents = async (req, res) => {
       if (!jersey_no) continue;
       if (!grouped[jersey_no]) {
         grouped[jersey_no] = {
-          __setNos: new Set(), // 👈 track unique sets here as well
+          __setNos: new Set(), // track unique sets here as well
           serve: { aces: 0, faults: 0, serve_hits: 0, total_attempts: 0 },
           attack: { spikes: 0, faults: 0, shots: 0, total_attempts: 0 },
           digs: { digs: 0, faults: 0, receptions: 0, total_attempts: 0 },

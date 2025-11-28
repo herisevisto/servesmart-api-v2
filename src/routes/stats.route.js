@@ -41,8 +41,8 @@ import { getAllMatches, getLatestMatch, getAllDLSUMatches, getAllGameMatch, getA
   deleteTeam,
   getPlayerSeasonStats,
   seasonTeamSummaryByTeamId,
-  updateTeamNotes
-   
+  updateTeamNotes,
+  coachTeamsForUI
 } from "../controllers/stats.ctrl.js";
 import {  } from "../controllers/user.ctrl.js";
 import { getSeasonReports, getSeasonReportById } from "../controllers/reports/season.ctrl.js";
@@ -161,5 +161,6 @@ router.get("/myPlayers", myPlayers);
 router.delete('/deleteTeam', deleteTeam);
 router.get("/playerSeasonStats", getPlayerSeasonStats);
 router.put('/update-team-notes', updateTeamNotes);
+router.get("/coachTeamsForUI", coachTeamsForUI);
 
 export default router;

@@ -57,7 +57,7 @@ export const computeEfficiencies = (report) => {
     (reception.total_attempts || 0) +
     (block.total_attempts || 0);
 
-  const overallEff = calcEff(pointsScored - errors, totalAttempts);
+  const overallEff = calcEff((pointsScored - errors), totalAttempts);
 
   return {
     ...report.toObject(),
@@ -137,8 +137,6 @@ export const getTeamReports = async (req, res) => {
     res.status(500).json({ error: "Failed to fetch team reports." });
   }
 };
-
-
 
 // =============================================================
 // GET single team report
@@ -234,8 +232,6 @@ export const getPlayersByTeamReportId = async (req, res) => {
   }
 };
 
-
-
 // =============================================================
 // AUTO BUILD TEAM REPORTS FROM PLAYER REPORTS
 // =============================================================
@@ -277,17 +273,21 @@ export const updateTeamReportsFromPlayers = async (req, res) => {
     }
 
     //  Compute team-level efficiencies
-    const serveEff = calcEff(overall.serve.aces - overall.serve.faults, overall.serve.total_attempts);
-    const spikeEff = calcEff(overall.attack.spikes - overall.attack.faults, overall.attack.total_attempts);
-    const digEff = calcEff(overall.digs.digs, overall.digs.total_attempts);
-    const blockEff = calcEff(overall.block.kill_blocks, overall.block.total_attempts);
-    const setEff = calcEff(overall.set.running_sets - overall.set.faults, overall.set.total_attempts);
-    const receptionEff = calcEff(overall.reception.excellents - overall.reception.faults, overall.reception.total_attempts);
+    const serveEff = calcEff(((overall.serve.aces + overall.serve.serve_hits) - overall.serve.faults), overall.serve.total_attempts);
+    const spikeEff = calcEff(((overall.attack.spikes + overall.attack.shots) - overall.attack.faults), overall.attack.total_attempts);
+    const digEff = calcEff(((overall.digs.digs + overall.digs.receptions) - overall.digs.faults), overall.digs.total_attempts);
+    const blockEff = calcEff(((overall.block.kill_blocks + overall.block.rebounds) - overall.block.fault), overall.block.total_attempts);
+    const setEff = calcEff(((overall.set.running_sets + overall.set.still_sets) - overall.set.faults), overall.set.total_attempts);
+    const receptionEff = calcEff(((overall.reception.excellents + overall.reception.serve_receptions) - overall.reception.faults), overall.reception.total_attempts);
 
-    const pointsScored = overall.attack.spikes + overall.serve.aces + overall.block.kill_blocks;
-    const errors = overall.attack.faults + overall.serve.faults + overall.block.faults + overall.reception.faults;
-    const totalAttempts = overall.attack.total_attempts + overall.serve.total_attempts + overall.reception.total_attempts + overall.block.total_attempts;
-    const overallEff = calcEff(pointsScored - errors, totalAttempts);
+    const pointsScored = overall.attack.spikes + overall.attack.shots + overall.serve.aces + overall.serve.serve_hits +
+    overall.block.kill_blocks + overall.block.rebounds + overall.digs.digs + overall.digs.receptions +
+    overall.set.running_sets + overall.set.still_sets + overall.reception.excellents + overall.reception.serve_receptions;
+    const errors = overall.attack.faults + overall.serve.faults + overall.block.faults + overall.reception.faults 
+    + overall.set.faults + overall.digs.faults;
+    const totalAttempts = overall.attack.total_attempts + overall.serve.total_attempts + overall.reception.total_attempts
+    + overall.block.total_attempts + overall.set.total_attempts + overall.digs.total_attempts;
+    const overallEff = calcEff((pointsScored - errors), totalAttempts);
 
     overall.serve.efficiency = serveEff;
     overall.attack.efficiency = spikeEff;
@@ -296,7 +296,7 @@ export const updateTeamReportsFromPlayers = async (req, res) => {
     overall.set.efficiency = setEff;
     overall.reception.efficiency = receptionEff;
     overall.overall_efficiency = overallEff;
-
+    
     // Find team name from Team collection
     let teamName = "Unknown Team";
     const teamDoc = await Team.findOne({ team_id: teamId });

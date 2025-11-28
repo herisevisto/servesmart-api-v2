@@ -895,6 +895,16 @@ export const createAthlete = async (req, res) => {
       gender,
     } = req.body || {};
 
+    const nOrNull = (v) => {
+      if (v == null || v === "" || v === "—" || v === "-") return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    const sOrNull = (v) => {
+      const s = String(v ?? "").trim();
+      return s ? s : null;
+    };
+
     if (!first_name && !last_name) {
       return res.status(400).json({ message: "First or last name is required" });
     }
@@ -910,15 +920,54 @@ export const createAthlete = async (req, res) => {
     }
     const affiliationKey = String(teamDoc.affiliation || "").toLowerCase().trim();
 
-    const nOrNull = (v) => {
-      if (v == null || v === "" || v === "—" || v === "-") return null;
-      const n = Number(v);
-      return Number.isFinite(n) ? n : null;
-    };
-    const sOrNull = (v) => {
-      const s = String(v ?? "").trim();
-      return s ? s : null;
-    };
+    // DUPLICATE CHECKS
+    const jerseyNo = nOrNull(jersey_no)
+    if(jerseyNo != null){
+      const jerseyTaken = await Athlete.exists({
+        team_id: teamIdNum,
+        jersey_no: jerseyNo
+      })
+
+      if(jerseyTaken){
+        return res.status(409).json({
+          message: `Jersey #${jerseyNo} is already used by another player in this team.`
+        })
+      }
+    }
+    
+    if(sOrNull(first_name) && sOrNull(last_name)){
+      const nameTaken = await Athlete.exists({
+        team_id: teamIdNum,
+        first_name: { $regex: new RegExp(`^${sOrNull(first_name)}$`, "i") },
+        last_name: { $regex: new RegExp(`^${sOrNull(last_name)}$`, "i") }
+      });
+      
+      if (nameTaken) {
+        return res.status(409).json({ 
+          message: `Player '${first_name} ${last_name}' already exists in this team.` 
+        });
+      }
+    }
+
+    if(sOrNull(email)){
+      const emailTaken = await PlayerProfile.exists({ 
+        email: { $regex: new RegExp(`^${sOrNull(email)}$`, "i") } 
+      });
+      if (emailTaken) {
+        return res.status(409).json({ 
+          message: `The email address '${email}' is already registered.` 
+        });
+      }
+    }
+
+    if(sOrNull(phone)){
+      const phoneTaken = await PlayerProfile.exists({ contact: sOrNull(phone) });
+      if (phoneTaken) {
+        return res.status(409).json({ 
+          message: `The phone number '${phone}' is already registered.` 
+        });
+      }
+    }
 
     const POS = ["S", "OH", "OP", "OS", "MB", "L", ""];
     const pos = (position || "").toUpperCase();
@@ -941,10 +990,10 @@ export const createAthlete = async (req, res) => {
     const cap = CAP.includes(captaincy) ? captaincy : "None";
 
     // 🔥 Only validate jersey if it's not null/empty
-    const jerseyNum = nOrNull(jersey_no);
+    /*const jerseyNum = nOrNull(jersey_no);
     if (jerseyNum != null) {
       await assertJerseyFree(teamIdNum, jerseyNum);
-    }
+    }*/
 
     const last = await Athlete.findOne().sort({ player_id: -1 }).select("player_id");
     const nextId = (last?.player_id ?? 0) + 1;
@@ -954,7 +1003,7 @@ export const createAthlete = async (req, res) => {
       first_name: sOrNull(first_name),
       last_name : sOrNull(last_name),
       position  : pos || "",
-      jersey_no : jerseyNum,
+      jersey_no : jerseyNo,
       age       : nOrNull(age),
       height    : nOrNull(height),
       weight    : nOrNull(weight),
@@ -1000,9 +1049,10 @@ export const createAthlete = async (req, res) => {
     });
   } catch (err) {
     console.error("createAthlete error:", err);
-    const msg = err?.message || "Server error creating athlete";
-    const code = /Jersey #\d+ is already taken/.test(msg) ? 409 : 500;
-    return res.status(code).json({ message: msg });
+    // Generic error fallback
+    return res.status(500).json({ 
+      message: err.message || "Server error creating athlete" 
+    });
   }
 };
 
@@ -1320,6 +1370,34 @@ export const createTryout = async (req, res) => {
     }
     const affiliationKey = String(teamDoc.affiliation || affiliation || 'dls').toLowerCase().trim();
 
+    // DUPLICATE CHECKS
+    const nameTaken = await Tryout.exists({
+      team_id: teamIdNum,
+      first_name: { $regex: new RegExp(`^${toStr(first_name)}$`, "i") },
+      last_name:  { $regex: new RegExp(`^${toStr(last_name)}$`, "i") }
+    });
+    if (nameTaken) {
+      return res.status(409).json({ 
+        message: `A tryout for '${first_name} ${last_name}' already exists in this team.` 
+      });
+    }
+
+    const emailTaken = await PlayerProfile.exists({ 
+      email: { $regex: new RegExp(`^${emailStr}$`, "i") } 
+    });
+    if (emailTaken) {
+      return res.status(409).json({ 
+        message: `The email address '${emailStr}' is already registered.` 
+      });
+    }
+
+    const phoneTaken = await PlayerProfile.exists({ contact: phoneStr });
+    if (phoneTaken) {
+      return res.status(409).json({ 
+        message: `The phone number '${phoneStr}' is already registered.` 
+      });
+    }
+
     const POS  = ["S", "OH", "OP", "OS", "MB", "L", ""];
     const STAT = ["Draft", "Selected", "Rejected"];
 
@@ -1402,6 +1480,9 @@ export const createTryout = async (req, res) => {
     console.error("createTryout error:", e);
     if (/required|Invalid position_pref|Invalid tryout_status|team_id|Gender/i.test(msg)) {
       return res.status(400).json({ message: msg });
+    }
+    if (e.code === 11000) {
+      return res.status(409).json({ message: "Duplicate entry found." });
     }
     return res.status(500).json({ message: "Server error creating tryout", detail: msg });
   }
@@ -1903,14 +1984,34 @@ export const createTeam = async (req, res) => {
       captain,
       co_captain,
       roster = [],
-      gender,             
+      gender,
     } = req.body || {};
 
     if (!name || !affiliation) {
       return res.status(400).json({ message: "Missing name or affiliation" });
     }
 
-    const affLower = canon(String(affiliation || "").trim());
+    const escapeRegex = (string) => {
+      return String(string).replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    };
+
+    const nameClean = String(name).trim();
+    const affClean = String(affiliation || "").trim();
+
+    // DUPLICATE CHECKS
+    const duplicate = await Teams.findOne({
+      name: { $regex: new RegExp(`^${escapeRegex(nameClean)}$`, "i") },
+      affiliation: { $regex: new RegExp(`^${escapeRegex(affClean)}$`, "i") }, 
+    }).lean();
+
+    if (duplicate) {
+      return res.status(409).json({ 
+        message: `The team '${nameClean}' already exists for ${affiliation}.` 
+      });
+    }
+
+    const affLower = (typeof canon === 'function' ? canon(affClean) : affClean.toLowerCase());
+    
     const team_id = await getNextTeamId();
 
     const mode =
@@ -1921,7 +2022,7 @@ export const createTeam = async (req, res) => {
     const genderCanon = GENDER_CANON(gender);
     if (!genderCanon) {
       return res.status(400).json({
-        message: 'Invalid gender. Use Male/Female (or M/F).',
+        message: "Invalid gender. Use Male/Female (or M/F).",
       });
     }
 
@@ -1932,7 +2033,7 @@ export const createTeam = async (req, res) => {
       name: String(name).trim(),
       captain: captain || null,
       co_captain: co_captain || null,
-      gender: genderCanon,           
+      gender: genderCanon,
     });
 
     const actorRole = String(
@@ -1948,29 +2049,44 @@ export const createTeam = async (req, res) => {
     const coachUserId = Number(actorUserIdRaw);
 
     if (actorRole === "coach" && Number.isFinite(coachUserId)) {
+      const mergeIds = (existing) => {
+        const out = [];
+        const addVal = (v) => {
+          if (v == null) return;
+          if (Array.isArray(v)) {
+            v.forEach(addVal);
+            return;
+          }
+          const n = Number(v);
+          if (Number.isFinite(n) && !out.includes(n)) out.push(n);
+        };
+        addVal(existing);
+        addVal(team_id);
+        return out;
+      };
+
+      const [userDoc, coachDoc] = await Promise.all([
+        User.findOne({ user_id: coachUserId }).lean(),
+        Coach.findOne({ user_id: coachUserId }).lean(),
+      ]);
+
+      const newUserTeamIds  = mergeIds(userDoc?.details?.team_id);
+      const newCoachTeamIds = mergeIds(coachDoc?.team_id);
+
       await User.updateOne(
         { user_id: coachUserId },
         {
-          $addToSet: {
-            "details.teams_handled": team_id,
-          },
-          $set: {
-            "details.team_id": team_id,
-          },
+          $addToSet: { "details.teams_handled": team_id },
+          $set: { "details.team_id": newUserTeamIds },
         }
       );
 
       await Coach.updateOne(
         { user_id: coachUserId },
         {
-          $addToSet: {
-            teams_handled: team_id,
-          },
-          $set: {
-            team_id: team_id,
-          },
-        },
-        { upsert: false }
+          $addToSet: { teams_handled: team_id },
+          $set: { team_id: newCoachTeamIds }, 
+        }
       );
     }
 
@@ -2374,7 +2490,7 @@ export const myPlayers = async (req, res) => {
     const ACTOR_USER_ID =
       req.user?.user_id != null ? Number(req.user.user_id)
       : req.headers['x-actor-user-id'] != null ? Number(req.headers['x-actor-user-id'])
-      : req.query?.user_id != null ? Number(req.query.user_id)  // ← add this line
+      : req.query?.user_id != null ? Number(req.query.user_id)
       : null;
 
     if (!Number.isFinite(ACTOR_USER_ID)) {
@@ -2390,11 +2506,21 @@ export const myPlayers = async (req, res) => {
 
     const maybeAdd = (v) => {
       if (v == null) return;
+
+      if (typeof v === 'object' && v.team_id != null) {
+        v = v.team_id;
+      }
+
       const n = Number(v);
       if (Number.isFinite(n) && n > 0) idSet.add(n);
     };
 
-    maybeAdd(coachDoc.team_id);
+    if (Array.isArray(coachDoc.team_id)) {
+      coachDoc.team_id.forEach(maybeAdd);
+    } else {
+      maybeAdd(coachDoc.team_id);
+    }
+
     if (Array.isArray(coachDoc.teams_handled)) {
       coachDoc.teams_handled.forEach(maybeAdd);
     }
@@ -2436,6 +2562,7 @@ export const myPlayers = async (req, res) => {
   }
 };
 
+
 export async function deleteTeam(req, res) {
   try {
     const rawId =
@@ -2445,7 +2572,9 @@ export async function deleteTeam(req, res) {
 
     const teamId = Number(rawId);
     if (!Number.isFinite(teamId) || teamId <= 0) {
-      return res.status(400).json({ message: "team_id is required and must be a positive number." });
+      return res
+        .status(400)
+        .json({ message: "team_id is required and must be a positive number." });
     }
 
     const actorRoleRaw = String(req.header("x-actor-role") || "").trim();
@@ -2463,8 +2592,12 @@ export async function deleteTeam(req, res) {
       return res.status(404).json({ message: "Team not found." });
     }
 
-    const actorAff = String(req.header("x-actor-affiliation") || "").trim().toLowerCase();
-    const targetAff = String(team.affiliation || "").trim().toLowerCase();
+    const actorAff = String(req.header("x-actor-affiliation") || "")
+      .trim()
+      .toLowerCase();
+    const targetAff = String(team.affiliation || "")
+      .trim()
+      .toLowerCase();
 
     if (actorRole === "coach" && actorAff && targetAff && actorAff !== targetAff) {
       return res.status(403).json({
@@ -2476,8 +2609,9 @@ export async function deleteTeam(req, res) {
       { team_id: teamId },
       {
         $set: {
-          team_id: null,
-          captaincy: "None",
+          team_id: null,     
+          team: null,        
+          captaincy: "None", 
         },
       }
     );
@@ -2485,6 +2619,39 @@ export async function deleteTeam(req, res) {
     await PracticeTeam.updateMany(
       { team_ref: team._id },
       { $set: { team_ref: null } }
+    );
+
+    await Coach.updateMany(
+      {
+        $or: [
+          { team_id: teamId },
+          { team_id: { $elemMatch: { $eq: teamId } } },
+          { teams_handled: teamId },
+          { teams_handled: String(teamId) },
+        ],
+      },
+      {
+        $pull: {
+          team_id: teamId,
+          teams_handled: { $in: [teamId, String(teamId)] },
+        },
+      }
+    );
+
+    await User.updateMany(
+      {
+        $or: [
+          { "details.team_id": teamId },
+          { "details.teams_handled": teamId },
+          { "details.teams_handled": String(teamId) },
+        ],
+      },
+      {
+        $pull: {
+          "details.team_id": teamId,
+          "details.teams_handled": { $in: [teamId, String(teamId)] },
+        },
+      }
     );
 
     await Teams.deleteOne({ team_id: teamId });
@@ -2854,3 +3021,50 @@ export const updateTeamNotes = async (req, res) => {
   }
 };
 
+export const coachTeamsForUI = async (req, res) => {
+  try {
+    const ACTOR_USER_ID =
+      req.user?.user_id != null ? Number(req.user.user_id)
+      : req.headers["x-actor-user-id"] != null ? Number(req.headers["x-actor-user-id"])
+      : req.query?.user_id != null ? Number(req.query.user_id)
+      : null;
+
+    if (!Number.isFinite(ACTOR_USER_ID)) {
+      return res.status(400).json({ message: "user_id is required" });
+    }
+
+    const coachDoc = await Coach.findOne({ user_id: ACTOR_USER_ID }).lean();
+    if (!coachDoc) return res.json([]);
+
+    const idSet = new Set();
+
+    const addNum = (v) => {
+      if (v == null) return;
+      const n = Number(
+        typeof v === "object" && v.team_id != null ? v.team_id : v
+      );
+      if (Number.isFinite(n) && n > 0) idSet.add(n);
+    };
+
+    if (Array.isArray(coachDoc.team_id)) coachDoc.team_id.forEach(addNum);
+    else addNum(coachDoc.team_id);
+
+    if (Array.isArray(coachDoc.teams_handled)) coachDoc.teams_handled.forEach(addNum);
+
+    const teamIds = [...idSet];
+    if (!teamIds.length) return res.json([]);
+
+    const teams = await Teams.find({ team_id: { $in: teamIds } }).lean();
+
+    const payload = teams.map(t => ({
+      id: t.team_id,
+      name: t.name,
+      affiliation: t.affiliation,
+    }));
+
+    return res.json(payload);
+  } catch (e) {
+    console.error("coachTeamsForUI error:", e);
+    return res.status(500).json({ message: "Server error", error: String(e.message) });
+  }
+};

@@ -436,7 +436,7 @@ export const finalizeMatch = async (req, res) => {
         // COPY TO EVENT INFO
         const uniqueTeamNames = [...new Set(statEntries.map(e => e.team))];
         const teamDocs = await Team.find({ name: { $in: uniqueTeamNames } });
-        const teamMap = {}
+        const teamIdMap = {};
         teamDocs.forEach(t => {
             teamMap[t.name] = { 
                 id: t.team_id, 
@@ -447,7 +447,7 @@ export const finalizeMatch = async (req, res) => {
         const eventsToArchive = statEntries.map(entry => {
             const teamData = teamMap[entry.team];
 
-            if (!teamData) { 
+            if(!resolvedTeamId){
                 console.warn(`⚠️ Warning: No team_id found for team "${entry.team}" in match ${match_no}`);
             }
             return{

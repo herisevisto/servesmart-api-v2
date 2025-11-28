@@ -8,7 +8,7 @@ const coachSchema = new mongoose.Schema({
     affiliation: { type: [String], default: ["dls"] },
     teams_handled: { type: [String], default: ["Green Spikers"] },
     date_joined:   { type: Date, default: Date.now },
-    team_id: { type: Number, required: true},
+    team_id: { type: [Number], default: []},
 }, { collection: "coaches" });
 
 

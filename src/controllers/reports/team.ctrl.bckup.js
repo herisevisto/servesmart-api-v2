@@ -21,7 +21,7 @@ export const computeEfficiencies = (report) => {
   const digEff = calcEff((((digs.digs || 0) + (digs.reception || 0)) - (digs.faults || 0)), digs.total_attempts || 0);
   const blockEff = calcEff((((block.kill_blocks || 0) + (block.rebounds || 0)) - (block.faults || 0)), block.total_attempts || 0);
   const setEff = calcEff((((set.running_sets || 0) + (set.still_sets || 0)) - (set.faults || 0)), set.total_attempts || 0);
-  const receptionEff = calcEff((((reception.excellents || 0) + (reception.servereceptions || 0)) - (reception.faults || 0)), reception.total_attempts || 0);
+  const receptionEff = calcEff((((reception.excellents || 0) + (reception.serve_receptions || 0)) - (reception.faults || 0)), reception.total_attempts || 0);
 
   // points scored = spikes + aces + kill blocks
   const pointsScored = 
@@ -53,7 +53,8 @@ export const computeEfficiencies = (report) => {
     (set.total_attempts || 0) +
     (reception.total_attempts || 0) +
     (block.total_attempts || 0);
-  const overallEff = calcEff(pointsScored - errors, totalAttempts);
+  
+  const overallEff = calcEff((pointsScored - errors), totalAttempts);
 
   return {
     ...report.toObject(),

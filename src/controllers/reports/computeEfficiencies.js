@@ -67,19 +67,20 @@ export const computeEfficiencies = (doc) => {
     const serveEff = calcEff(((serve.aces + serve.serve_hits) - serve.faults), serve.total_attempts);
     const spikeEff = calcEff(((attack.spikes + attack.shots) - attack.faults), attack.total_attempts);
     const digEff = calcEff(((digs.digs + digs.receptions) - digs.faults), digs.total_attempts);
-    const blockEff = calcEff(((block.kill_blocks + block.rebounds) - block.kill_blocks), block.total_attempts);
+    const blockEff = calcEff(((block.kill_blocks + block.rebounds) - block.faults), block.total_attempts);
     const setEff = calcEff(((set.running_sets + set.still_sets) - set.faults), set.total_attempts);
     const receptionEff = calcEff(((reception.excellents + reception.serve_receptions) - reception.faults), reception.total_attempts);
 
     // Overall efficiency
-    const pointsScored = attack.spikes + attack.shots + serve.aces + serve.serve_hits + digs.digs + digs.receptions + block.kill_blocks + block.rebounds + still.running_sets + still.still_sets + reception.excellents + reception.serve_receptions;
+    const pointsScored = attack.spikes + attack.shots + serve.aces + serve.serve_hits + digs.digs + digs.receptions 
+      + block.kill_blocks + block.rebounds + still.running_sets + still.still_sets + reception.excellents + reception.serve_receptions;
     const errors = attack.faults + serve.faults + block.faults + reception.faults + digs.faults + set.faults;
     const totalAttempts = attack.total_attempts + serve.total_attempts + digs.total_attempts + set.total_attempts
                          reception.total_attempts + block.total_attempts;
 
-    const overallEff = calcEff(pointsScored - errors)/ totalAttempts;
+    const overallEff = calcEff((pointsScored - errors), totalAttempts);
 
-    console.log("✅ Computed Efficiencies:", {
+    console.log("Computed Efficiencies:", {
       team: data.team || data.first_name,
       serveEff,
       spikeEff,
@@ -107,7 +108,7 @@ export const computeEfficiencies = (doc) => {
       },
     };
   } catch (error) {
-    console.error("❌ Error in computeEfficiencies:", error);
+    console.error("Error in computeEfficiencies:", error);
     return doc; // Return original doc if computation fails
   }
 };
